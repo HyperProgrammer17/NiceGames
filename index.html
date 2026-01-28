@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mein Game Hub</title>
+    <style>
+        /* Farbschemata definieren */
+        :root {
+            --bg-color: #f0f2f5;
+            --container-bg: rgba(255, 255, 255, 0.8);
+            --text-color: #1a1a1b;
+            --accent-color: #6366f1;
+            --button-hover: #4f46e5;
+            --card-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --container-bg: rgba(30, 41, 59, 0.7);
+            --text-color: #f8fafc;
+            --accent-color: #818cf8;
+            --button-hover: #a5b4fc;
+            --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Hintergrund-Deko */
+        .blob {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: var(--accent-color);
+            filter: blur(80px);
+            opacity: 0.2;
+            z-index: -1;
+            border-radius: 50%;
+        }
+
+        .main-container {
+            background: var(--container-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 3rem;
+            border-radius: 24px;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        h1 {
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+            letter-spacing: -1px;
+        }
+
+        .game-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .game-link {
+            display: block;
+            padding: 1rem 2rem;
+            background-color: var(--accent-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transform: translateY(0);
+            transition: all 0.2s ease;
+        }
+
+        .game-link:hover {
+            background-color: var(--button-hover);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--container-bg);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 50px;
+            cursor: pointer;
+            color: var(--text-color);
+            font-weight: bold;
+            box-shadow: var(--card-shadow);
+        }
+
+        .theme-toggle:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="blob" style="top: -100px; left: -100px;"></div>
+    <div class="blob" style="bottom: -100px; right: -100px;"></div>
+
+    <button class="theme-toggle" id="themeBtn">🌙 Night Mode</button>
+
+    <div class="main-container">
+        <h1>Game Center</h1>
+        
+        <div class="game-list">
+            <a href="game1.html" class="game-link">🎮 Super Game 1</a>
+            <a href="game2.html" class="game-link">🚀 Space Adventure</a>
+            <a href="game3.html" class="game-link">🧩 Puzzle Master</a>
+            <a href="game4.html" class="game-link">⚔️ Arena Combat</a>
+            <a href="game5.html" class="game-link">🏁 Turbo Racer</a>
+        </div>
+    </div>
+
+    <script>
+        const themeBtn = document.getElementById('themeBtn');
+        const body = document.documentElement;
+        let isDark = false;
+
+        themeBtn.addEventListener('click', () => {
+            isDark = !isDark;
+            if (isDark) {
+                body.setAttribute('data-theme', 'dark');
+                themeBtn.innerHTML = "☀️ Day Mode";
+            } else {
+                body.removeAttribute('data-theme');
+                themeBtn.innerHTML = "🌙 Night Mode";
+            }
+        });
+    </script>
+</body>
+</html>

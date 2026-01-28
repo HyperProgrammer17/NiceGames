@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON SURVIVOR - XTREME</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-pink: #ff007f;
+            --neon-purple: #bc13fe;
+            --gold: #ffcc00;
+            --bg-dark: #020205;
+            --hp-red: #ff4e50;
+            --matrix-green: #00ff41;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            background: var(--bg-dark);
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            width: 100%; height: 100%;
+        }
+
+        /* Hintergrund-Grid Animation */
+        #gameContainer {
+            width: 100vw; height: 100vh;
+            position: relative;
+            background: radial-gradient(circle at center, #0a0a2a 0%, #020205 100%);
+            background-image: 
+                linear-gradient(rgba(0, 242, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 10s linear infinite;
+        }
+
+        @keyframes gridMove {
+            from { background-position: 0 0; }
+            to { background-position: 50px 50px; }
+        }
+
+        /* --- HUD (Cyber Style) --- */
+        .hud {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: rgba(0, 0, 0, 0.7); padding: 20px;
+            border-radius: 15px; border: 2px solid var(--neon-blue);
+            min-width: 260px; pointer-events: none;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2), inset 0 0 10px rgba(0, 242, 255, 0.1);
+        }
+
+        /* Menu Button im Spiel */
+        .menu-btn-top {
+            position: absolute; top: 20px; right: 20px; z-index: 1100;
+            background: rgba(0, 0, 0, 0.6); border: 1px solid var(--neon-pink);
+            color: var(--neon-pink); padding: 10px 20px; border-radius: 8px;
+            font-family: 'Orbitron'; cursor: pointer; transition: 0.3s;
+            text-decoration: none; font-size: 12px; font-weight: 900;
+        }
+        .menu-btn-top:hover { background: var(--neon-pink); color: black; box-shadow: 0 0 15px var(--neon-pink); }
+
+        .bar-container { margin-bottom: 12px; }
+        .bar-label { font-size: 11px; margin-bottom: 5px; display: flex; justify-content: space-between; text-shadow: 0 0 5px var(--neon-blue); }
+        
+        .bar {
+            width: 100%; height: 14px; background: rgba(255,255,255,0.05);
+            border-radius: 7px; overflow: hidden; border: 1px solid #444;
+        }
+
+        .fill { height: 100%; width: 0%; transition: width 0.3s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
+        #hpFill { background: linear-gradient(90deg, #600, var(--hp-red)); box-shadow: 0 0 15px var(--hp-red); }
+        #ultFill { background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple)); box-shadow: 0 0 15px var(--neon-purple); }
+        #expFill { background: linear-gradient(90deg, #b8860b, var(--gold)); box-shadow: 0 0 15px var(--gold); }
+
+        .stat-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; font-weight: 900; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+            display: none; flex-direction: column; align-items: center;
+            justify-content: center; z-index: 2000; backdrop-filter: blur(20px);
+        }
+
+        .grid-layout {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px; width: 90%; max-width: 1200px; padding: 20px;
+        }
+
+        .card {
+            background: rgba(20, 20, 30, 0.8); border: 2px solid #333; padding: 20px;
+            border-radius: 15px; cursor: pointer; text-align: center;
+            transition: 0.3s; position: relative; overflow: hidden;
+        }
+        .card:hover { border-color: var(--neon-blue); transform: translateY(-5px); box-shadow: 0 0 30px rgba(0, 242, 255, 0.3); }
+        .card h3 { margin: 10px 0; color: var(--neon-blue); }
+        .card p { font-size: 12px; color: #ccc; }
+
+        .btn-main {
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple)); 
+            color: white; border: none; padding: 18px 50px; font-family: 'Orbitron'; font-weight: 900;
+            cursor: pointer; border-radius: 50px; margin-top: 20px; box-shadow: 0 0 20px var(--neon-blue);
+            text-decoration: none; display: inline-block;
+        }
+
+        .btn-alt {
+            background: transparent; border: 2px solid var(--neon-pink);
+            color: var(--neon-pink); padding: 15px 40px; font-family: 'Orbitron'; font-weight: 900;
+            cursor: pointer; border-radius: 50px; margin-top: 15px; transition: 0.3s;
+            text-decoration: none; display: inline-block;
+        }
+        .btn-alt:hover { background: var(--neon-pink); color: black; }
+
+        /* --- GAME OBJECTS --- */
+        #player {
+            position: absolute; width: 44px; height: 44px;
+            border-radius: 12px; z-index: 500;
+            transition: background 0.3s;
+        }
+
+        .fireball {
+            position: absolute; width: 28px; height: 28px;
+            background: radial-gradient(circle, #fff 0%, transparent 70%);
+            border-radius: 50%; z-index: 450;
+        }
+
+        .enemy {
+            position: absolute; width: 38px; height: 38px;
+            background: #111; border: 2px solid var(--hp-red);
+            border-radius: 10px; z-index: 400; box-shadow: 0 0 10px var(--hp-red);
+        }
+
+        .damage-popup {
+            position: absolute; color: white; font-weight: 900; pointer-events: none;
+            animation: floatUp 0.8s forwards; z-index: 900; text-shadow: 0 0 10px black;
+        }
+
+        @keyframes floatUp { to { transform: translateY(-60px) scale(1.5); opacity: 0; } }
+        
+        .ult-flash { animation: flashEffect 0.5s ease-out; }
+        @keyframes flashEffect { 0% { filter: brightness(5); } 100% { filter: brightness(1); } }
+        
+        .shake { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(3px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-5px, 0, 0); } }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <a href="index.html" class="menu-btn-top">EXIT TO MENU</a>
+
+    <div class="hud">
+        <div class="stat-row">
+            <span style="color:var(--gold)">💰 <span id="goldText">0</span></span>
+            <span style="color:var(--neon-blue)">🏆 <span id="hiText">0</span></span>
+        </div>
+        <div class="stat-row">
+            <span>SCR: <span id="scoreText">0</span></span>
+            <span>WVE: <span id="waveText">1</span></span>
+        </div>
+        
+        <div class="bar-container">
+            <div class="bar-label"><span>SYSTEM INTEGRITY</span><span id="hpPercent">100%</span></div>
+            <div class="bar"><div id="hpFill" class="fill" style="width: 100%"></div></div>
+        </div>
+        
+        <div class="bar-container">
+            <div class="bar-label"><span>ULTIMATE SYNC [SPACE]</span><span id="ultPercent">0%</span></div>
+            <div class="bar"><div id="ultFill" class="fill"></div></div>
+        </div>
+        
+        <div class="bar-container">
+            <div class="bar-label"><span>DATA LEVEL</span><span id="expPercent">0%</span></div>
+            <div class="bar"><div id="expFill" class="fill"></div></div>
+        </div>
+    </div>
+
+    <div id="player"></div>
+
+    <div id="upgradeScreen" class="screen">
+        <h1 style="color:var(--neon-blue); font-size: 40px; text-shadow: 0 0 20px var(--neon-blue);">SYSTEM UPGRADE</h1>
+        <div id="upgradeOptions" class="grid-layout"></div>
+    </div>
+
+    <div id="shopScreen" class="screen">
+        <h1 style="color:var(--gold); font-size: 40px;">NEON ARMORY</h1>
+        <div id="shopGrid" class="grid-layout" style="overflow-y: auto; max-height: 70vh;"></div>
+        <button class="btn-main" onclick="toggleShop()">RETURN TO SECTOR (P)</button>
+    </div>
+
+    <div id="gameOverScreen" class="screen">
+        <h1 style="color:var(--neon-pink); font-size: 80px; text-shadow: 0 0 30px var(--neon-pink);">TERMINATED</h1>
+        <p id="finalStats" style="font-size: 24px; letter-spacing: 5px;"></p>
+        <button class="btn-main" onclick="location.reload()">REBOOT SYSTEM</button>
+        <a href="index.html" class="btn-alt">MAIN MENU</a>
+    </div>
+</div>
+
+<script>
+// --- KONFIGURATION (10 SKINS & ULTS) ---
+const skins = [
+    { id: 0, name: "Vanguard", price: 0, color: "#00f2ff", ult: "Frost Nova", desc: "Friert alle Gegner für 5s ein." },
+    { id: 1, name: "Interceptor", price: 500, color: "#ff007f", ult: "Hyperdrive", desc: "3x Geschwindigkeit & Unverwundbarkeit für 6s." },
+    { id: 2, name: "Midas", price: 1500, color: "#ffcc00", ult: "Gold Rush", desc: "Löscht alle Gegner aus & gibt Bonus Gold." },
+    { id: 3, name: "Specter", price: 3000, color: "#ffffff", ult: "Void Walk", desc: "Feuerbälle rotieren 500% schneller für 8s." },
+    { id: 4, name: "Toxic", price: 5000, color: "#39ff14", ult: "Acid Rain", desc: "Gegner werden permanent 50% langsamer." },
+    { id: 5, name: "Inferno", price: 7500, color: "#ff4500", ult: "Supernova", desc: "Feuerbälle vergrößern sich massiv." },
+    { id: 6, name: "Cyber", price: 10000, color: "#bc13fe", ult: "Glitch", desc: "Teleportiert Gegner zurück zum Rand." },
+    { id: 7, name: "Marine", price: 15000, color: "#1e90ff", ult: "Tsunami", desc: "Vollständige Heilung + Schild." },
+    { id: 8, name: "Blood", price: 25000, color: "#8b0000", ult: "Berserk", desc: "Schaden x10 für 5 Sekunden." },
+    { id: 9, name: "Titan", price: 50000, color: "#444444", ult: "Obliterate", desc: "Löscht 2 Wellen sofort aus." }
+];
+
+let stats = {
+    gold: 0, highScore: 0, score: 0, wave: 1,
+    hp: 100, maxHp: 100, exp: 0, nextExp: 10,
+    speed: 5, dmg: 10, fbCount: 1, fbSize: 28, fbRadius: 110, fbSpeed: 0.06,
+    crit: 0.1, ultCharge: 0, activeSkin: 0
+};
+
+let playerPos = { x: window.innerWidth/2, y: window.innerHeight/2 };
+let enemies = [], fireballs = [], keys = {};
+let isPaused = false, isGameOver = false, ultActive = false;
+let lastSpawn = 0, angle = 0;
+
+const playerEl = document.getElementById('player');
+const container = document.getElementById('gameContainer');
+
+function init() {
+    load();
+    updateSkinVisuals();
+    createFireballs();
+    requestAnimationFrame(gameLoop);
+}
+
+function createFireballs() {
+    fireballs.forEach(f => f.el.remove());
+    fireballs = [];
+    const color = skins[stats.activeSkin].color;
+    for(let i=0; i<stats.fbCount; i++) {
+        const el = document.createElement('div');
+        el.className = 'fireball';
+        el.style.boxShadow = `0 0 20px ${color}`;
+        el.style.background = `radial-gradient(circle, #fff, ${color})`;
+        container.appendChild(el);
+        fireballs.push({ el, id: Math.random() });
+    }
+}
+
+function gameLoop() {
+    if(!isPaused && !isGameOver) {
+        movePlayer();
+        moveFireballs();
+        handleEnemies();
+        updateHUD();
+
+        if(Date.now() - lastSpawn > Math.max(250, 1400 - (stats.wave * 80))) {
+            spawnEnemy();
+            lastSpawn = Date.now();
+        }
+    }
+    requestAnimationFrame(gameLoop);
+}
+
+function movePlayer() {
+    let moveX = 0, moveY = 0;
+    if(keys['w'] || keys['arrowup']) moveY -= stats.speed;
+    if(keys['s'] || keys['arrowdown']) moveY += stats.speed;
+    if(keys['a'] || keys['arrowleft']) moveX -= stats.speed;
+    if(keys['d'] || keys['arrowright']) moveX += stats.speed;
+
+    playerPos.x = Math.max(0, Math.min(window.innerWidth - 44, playerPos.x + moveX));
+    playerPos.y = Math.max(0, Math.min(window.innerHeight - 44, playerPos.y + moveY));
+    playerEl.style.transform = `translate(${playerPos.x}px, ${playerPos.y}px)`;
+}
+
+function moveFireballs() {
+    angle += stats.fbSpeed;
+    fireballs.forEach((fb, i) => {
+        const offset = (i * (Math.PI * 2 / stats.fbCount));
+        const x = (playerPos.x + 22) + Math.cos(angle + offset) * stats.fbRadius - (stats.fbSize/2);
+        const y = (playerPos.y + 22) + Math.sin(angle + offset) * stats.fbRadius - (stats.fbSize/2);
+        fb.el.style.transform = `translate(${x}px, ${y}px)`;
+        fb.el.style.width = stats.fbSize + "px";
+        fb.el.style.height = stats.fbSize + "px";
+    });
+}
+
+function handleEnemies() {
+    for(let i = enemies.length-1; i >= 0; i--) {
+        const en = enemies[i];
+        if(!en.frozen) {
+            const dx = playerPos.x - en.x, dy = playerPos.y - en.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            en.x += (dx/dist) * en.speed;
+            en.y += (dy/dist) * en.speed;
+            en.el.style.transform = `translate(${en.x}px, ${en.y}px)`;
+            if(dist < 40 && !ultActive) takeDamage(0.6);
+        }
+        fireballs.forEach(fb => {
+            const fbIdx = fireballs.indexOf(fb);
+            const off = fbIdx * (Math.PI * 2 / stats.fbCount);
+            const fbX = (playerPos.x + 22) + Math.cos(angle + off) * stats.fbRadius;
+            const fbY = (playerPos.y + 22) + Math.sin(angle + off) * stats.fbRadius;
+            const distToFb = Math.sqrt(Math.pow(en.x + 19 - fbX, 2) + Math.pow(en.y + 19 - fbY, 2));
+            if(distToFb < (stats.fbSize/2 + 15)) {
+                if(!en.cooldowns[fb.id] || Date.now() - en.cooldowns[fb.id] > 350) {
+                    damageEnemy(en, stats.dmg);
+                    en.cooldowns[fb.id] = Date.now();
+                }
+            }
+        });
+        if(en.hp <= 0) killEnemy(en, i);
+    }
+}
+
+function takeDamage(amt) {
+    stats.hp -= amt;
+    if(stats.hp <= 0) die();
+    container.classList.add('shake');
+    setTimeout(() => container.classList.remove('shake'), 150);
+}
+
+function damageEnemy(en, amount) {
+    const crit = Math.random() < stats.crit;
+    const finalDmg = crit ? amount * 2.5 : amount;
+    en.hp -= finalDmg;
+    en.el.style.filter = "brightness(5) contrast(2)";
+    setTimeout(() => en.el.style.filter = "none", 80);
+    showDamage(en.x, en.y, Math.floor(finalDmg), crit);
+}
+
+function killEnemy(en, index) {
+    en.el.remove();
+    enemies.splice(index, 1);
+    stats.score++;
+    stats.gold += (5 + stats.wave);
+    stats.exp += 2.5;
+    stats.ultCharge = Math.min(100, stats.ultCharge + 4);
+    if(stats.exp >= stats.nextExp) levelUp();
+    if(stats.score % 40 === 0) stats.wave++;
+}
+
+function spawnEnemy() {
+    const el = document.createElement('div');
+    el.className = 'enemy';
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+    if(side==0){ x=Math.random()*window.innerWidth; y=-60; }
+    else if(side==1){ x=window.innerWidth+60; y=Math.random()*window.innerHeight; }
+    else if(side==2){ x=Math.random()*window.innerWidth; y=window.innerHeight+60; }
+    else { x=-60; y=Math.random()*window.innerHeight; }
+    el.style.transform = `translate(${x}px, ${y}px)`;
+    container.appendChild(el);
+    enemies.push({ el, x, y, hp: 20 + (stats.wave * 12), speed: 1.3 + (stats.wave * 0.12), cooldowns: {}, frozen: false });
+}
+
+function updateHUD() {
+    const hpRatio = (stats.hp / stats.maxHp) * 100;
+    document.getElementById('hpFill').style.width = hpRatio + "%";
+    document.getElementById('hpPercent').innerText = Math.max(0, Math.ceil(hpRatio)) + "%";
+    document.getElementById('ultFill').style.width = stats.ultCharge + "%";
+    document.getElementById('ultPercent').innerText = Math.floor(stats.ultCharge) + "%";
+    const expRatio = (stats.exp / stats.nextExp) * 100;
+    document.getElementById('expFill').style.width = expRatio + "%";
+    document.getElementById('expPercent').innerText = Math.floor(expRatio) + "%";
+    document.getElementById('goldText').innerText = stats.gold;
+    document.getElementById('scoreText').innerText = stats.score;
+    document.getElementById('waveText').innerText = stats.wave;
+    document.getElementById('hiText').innerText = stats.highScore;
+}
+
+function useUltimate() {
+    if(stats.ultCharge < 100 || ultActive) return;
+    stats.ultCharge = 0;
+    ultActive = true;
+    container.classList.add('ult-flash');
+    setTimeout(() => container.classList.remove('ult-flash'), 500);
+    const s = stats.activeSkin;
+    if(s == 0) {
+        enemies.forEach(en => { en.frozen = true; en.el.style.borderColor = "var(--neon-blue)"; });
+        setTimeout(() => { enemies.forEach(en => en.frozen = false); ultActive = false; }, 5000);
+    } else if(s == 1) {
+        const oldSpeed = stats.speed; stats.speed *= 3;
+        setTimeout(() => { stats.speed = oldSpeed; ultActive = false; }, 6000);
+    } else if(s == 2) {
+        stats.gold += enemies.length * 10;
+        enemies.forEach(en => en.hp = 0);
+        ultActive = false;
+    } else if(s == 3) {
+        const oldFB = stats.fbSpeed; stats.fbSpeed *= 5;
+        setTimeout(() => { stats.fbSpeed = oldFB; ultActive = false; }, 8000);
+    } else if(s == 4) {
+        enemies.forEach(en => en.speed *= 0.5);
+        ultActive = false;
+    } else if(s == 5) {
+        const oldSize = stats.fbSize; stats.fbSize *= 4;
+        setTimeout(() => { stats.fbSize = oldSize; ultActive = false; }, 6000);
+    } else if(s == 6) {
+        enemies.forEach(en => { en.x = -100; en.y = -100; });
+        ultActive = false;
+    } else if(s == 7) {
+        stats.hp = stats.maxHp;
+        ultActive = false;
+    } else if(s == 8) {
+        const oldDmg = stats.dmg; stats.dmg *= 10;
+        setTimeout(() => { stats.dmg = oldDmg; ultActive = false; }, 5000);
+    } else if(s == 9) {
+        enemies.forEach(en => en.hp = 0);
+        stats.wave++;
+        ultActive = false;
+    }
+}
+
+function levelUp() {
+    isPaused = true;
+    stats.exp = 0;
+    stats.nextExp *= 1.35;
+    const screen = document.getElementById('upgradeScreen');
+    const optCont = document.getElementById('upgradeOptions');
+    optCont.innerHTML = "";
+    screen.style.display = "flex";
+    const allOpts = [
+        { n: "💥 Overpower", d: "+15 Schaden", a: () => stats.dmg += 15 },
+        { n: "☄️ Satellite", d: "+1 Feuerball", a: () => { stats.fbCount++; createFireballs(); } },
+        { n: "⚡ Reflexes", d: "+1.2 Speed", a: () => stats.speed += 1.2 },
+        { n: "🛡️ Nanobots", d: "Max HP +20 & Heal", a: () => { stats.maxHp += 20; stats.hp = stats.maxHp; } },
+        { n: "🌀 Expansion", d: "+25 Orbit Radius", a: () => stats.fbRadius += 25 },
+        { n: "🎯 Precision", d: "+10% Crit Chance", a: () => stats.crit += 0.1 },
+        { n: "💣 Big Bang", d: "+10 Feuerball Größe", a: () => stats.fbSize += 10 }
+    ];
+    allOpts.sort(() => 0.5-Math.random()).slice(0, 3).forEach(o => {
+        const div = document.createElement('div');
+        div.className = "card";
+        div.innerHTML = `<h3>${o.n}</h3><p>${o.d}</p>`;
+        div.onclick = () => { o.a(); isPaused = false; screen.style.display = "none"; updateHUD(); };
+        optCont.appendChild(div);
+    });
+}
+
+function toggleShop() {
+    if(isGameOver) return;
+    isPaused = !isPaused;
+    const s = document.getElementById('shopScreen');
+    s.style.display = isPaused ? "flex" : "none";
+    if(isPaused) renderShop();
+}
+
+function renderShop() {
+    const grid = document.getElementById('shopGrid');
+    grid.innerHTML = "";
+    skins.forEach(skin => {
+        const bought = localStorage.getItem('skin_unlocked_xtreme_'+skin.id) === "true" || skin.price === 0;
+        const div = document.createElement('div');
+        div.className = "card";
+        div.style.borderColor = skin.color;
+        div.innerHTML = `
+            <div style="width:30px; height:30px; background:${skin.color}; margin:0 auto; border-radius:5px;"></div>
+            <h3>${skin.name}</h3>
+            <p>${skin.ult}</p>
+            <p style="margin-top:10px; font-size:14px; color:${bought?'var(--matrix-green)':'var(--gold)'}">
+                ${bought ? (stats.activeSkin == skin.id ? "EQUIPPED" : "SELECT") : skin.price + " GOLD"}
+            </p>
+        `;
+        div.onclick = () => {
+            if(bought) { stats.activeSkin = skin.id; updateSkinVisuals(); createFireballs(); save(); renderShop(); }
+            else if(stats.gold >= skin.price) {
+                stats.gold -= skin.price;
+                localStorage.setItem('skin_unlocked_xtreme_'+skin.id, "true");
+                save(); renderShop();
+            }
+        };
+        grid.appendChild(div);
+    });
+}
+
+function updateSkinVisuals() {
+    const skin = skins[stats.activeSkin];
+    playerEl.style.backgroundColor = skin.color;
+    playerEl.style.boxShadow = `0 0 25px ${skin.color}, inset 0 0 10px white`;
+}
+
+function showDamage(x, y, val, crit) {
+    const el = document.createElement('div');
+    el.className = "damage-popup";
+    el.style.left = x + "px"; el.style.top = y + "px";
+    el.innerText = crit ? "CRIT " + val : val;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 800);
+}
+
+function die() {
+    isGameOver = true;
+    if(stats.score > stats.highScore) stats.highScore = stats.score;
+    save();
+    document.getElementById('gameOverScreen').style.display = "flex";
+    document.getElementById('finalStats').innerText = `SCORE: ${stats.score} | WAVE: ${stats.wave}`;
+}
+
+function save() { localStorage.setItem('neon_save_xtreme', JSON.stringify({ gold: stats.gold, hi: stats.highScore, skin: stats.activeSkin })); }
+function load() {
+    const d = JSON.parse(localStorage.getItem('neon_save_xtreme'));
+    if(d) { stats.gold = d.gold || 0; stats.highScore = d.hi || 0; stats.activeSkin = d.skin || 0; }
+}
+
+window.onkeydown = e => { 
+    keys[e.key.toLowerCase()] = true; 
+    if(e.key.toLowerCase() === 'p') toggleShop(); 
+    if(e.key === ' ') { e.preventDefault(); useUltimate(); }
+};
+window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+
+init();
+</script>
+</body>
+</html>

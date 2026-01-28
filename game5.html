@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON DRIFT - ULTIMATE SPEED</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f2ff; --neon-pink: #ff007f; --neon-purple: #bc13fe;
+            --gold: #ffcc00; --bg: #020205;
+        }
+        body, html { margin: 0; padding: 0; background: var(--bg); color: white; font-family: 'Orbitron', sans-serif; overflow: hidden; }
+        
+        #gameArea { width: 100vw; height: 100vh; position: relative; overflow: hidden; perspective: 800px; display: none; }
+
+        #road {
+            position: absolute; bottom: -50%; left: 50%; transform: translateX(-50%) rotateX(45deg);
+            width: 1000px; height: 4000px;
+            background: 
+                linear-gradient(to bottom, transparent, rgba(0,242,255,0.1)),
+                repeating-linear-gradient(to bottom, #111 0%, #111 5%, #1a1a1a 5%, #1a1a1a 10%);
+            border-left: 20px solid var(--neon-blue); border-right: 20px solid var(--neon-blue);
+            box-shadow: 0 0 50px rgba(0,242,255,0.2);
+        }
+
+        .hud { position: absolute; top: 20px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.85); padding: 20px; border-radius: 12px; border: 1px solid var(--neon-blue); min-width: 250px; backdrop-filter: blur(10px); }
+        .speedo { font-size: 35px; font-weight: 900; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        .bar-bg { width: 100%; height: 10px; background: #222; border-radius: 5px; margin-top: 10px; overflow: hidden; border: 1px solid #444; }
+        #turboFill { height: 100%; width: 0%; background: var(--neon-pink); transition: 0.1s linear; }
+        
+        #player {
+            position: absolute; bottom: 100px; left: 50%; width: 55px; height: 95px;
+            background: white; border-radius: 6px; transform: translateX(-50%); z-index: 500;
+            transition: transform 0.1s ease-out, background 0.3s;
+        }
+
+        /* OBJEKTE */
+        .rival { position: absolute; width: 55px; height: 95px; border-radius: 6px; z-index: 400; box-shadow: 0 0 15px rgba(255,0,0,0.5); }
+        .gold { position: absolute; width: 45px; height: 45px; background: var(--gold); border-radius: 50%; box-shadow: 0 0 25px var(--gold); z-index: 300; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-weight: 900; color: black; }
+        .turbo-item { position: absolute; width: 25px; height: 45px; background: var(--neon-pink); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); z-index: 300; filter: drop-shadow(0 0 10px var(--neon-pink)); }
+
+        /* MENÜS */
+        .screen { position: fixed; inset: 0; background: rgba(0,0,0,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; text-align: center; }
+        .shop-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 30px 0; width: 90%; max-width: 1000px; }
+        .car-card { background: #111; border: 2px solid #333; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.3s; }
+        .car-card:hover { border-color: var(--neon-blue); transform: translateY(-5px); }
+        .car-card.selected { border-color: var(--gold); background: #1a1a00; box-shadow: 0 0 20px rgba(255,204,0,0.3); }
+        
+        .btn { background: var(--neon-blue); color: black; border: none; padding: 18px 45px; font-family: 'Orbitron'; font-weight: 900; cursor: pointer; border-radius: 8px; margin: 10px; text-transform: uppercase; transition: 0.2s; }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 30px var(--neon-blue); }
+        .btn-index { background: var(--neon-purple); color: white; border: 2px solid white; margin-top: 40px; }
+        
+        .wave-banner { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; font-weight: 900; color: var(--neon-blue); opacity: 0; pointer-events: none; z-index: 1500; text-shadow: 0 0 30px var(--neon-blue); }
+        .wave-anim { animation: wavePop 2.5s ease-out; }
+        @keyframes wavePop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } }
+
+        .motion-blur { filter: blur(4px) contrast(1.2); }
+    </style>
+</head>
+<body>
+
+    <div id="menuScreen" class="screen">
+        <h1 style="font-size: 80px; color: var(--neon-blue); text-shadow: 0 0 40px var(--neon-blue); margin: 0;">NEON DRIFT</h1>
+        <p style="color: var(--neon-pink); letter-spacing: 10px; margin-bottom: 40px;">SPEED DOMINATION</p>
+        <button class="btn" onclick="startGame()">RACE STARTEN</button>
+        <button class="btn" onclick="openGarage()">GARAGE</button>
+        <button class="btn btn-index" onclick="window.location.href='index.html'">EXIT TO HOMEPAGE</button>
+    </div>
+
+    <div id="garageScreen" class="screen" style="display:none;">
+        <h1 style="color:var(--gold); font-size: 50px;">DEINE FLOTTE</h1>
+        <div id="shopGrid" class="shop-grid"></div>
+        <div style="font-size: 30px; color: var(--gold); text-shadow: 0 0 10px var(--gold);">DEIN GOLD: <span id="garageGold">0</span></div>
+        <button class="btn" onclick="closeGarage()">ZURÜCK</button>
+    </div>
+
+    <div id="gameArea">
+        <div id="waveBanner" class="wave-banner">WELLE 1</div>
+        <div class="hud">
+            <div class="speedo"><span id="speedTxt">0</span> <small style="font-size:15px">KM/H</small></div>
+            <div style="color:var(--gold); font-size: 24px; font-weight: 900; margin-top: 5px;">💰 <span id="goldTxt">0</span></div>
+            <div style="font-size:14px; color:var(--neon-pink); margin-top:10px;">TURBO (SPACE)</div>
+            <div class="bar-bg"><div id="turboFill"></div></div>
+            <div style="margin-top:15px; font-size: 12px; opacity: 0.7;">WELLE: <span id="waveTxt">1</span> | ESC zum Beenden</div>
+        </div>
+        <div id="road"></div>
+        <div id="player"></div>
+    </div>
+
+    <div id="gameOverScreen" class="screen" style="display:none;">
+        <h1 style="color:var(--neon-pink); font-size: 80px;">CRASHED</h1>
+        <p id="statsTxt" style="font-size: 25px; color: white;"></p>
+        <button class="btn" onclick="startGame()">RETRY</button>
+        <button class="btn" style="background: #444; color: white;" onclick="exitToMenu()">MENÜ</button>
+    </div>
+
+<script>
+let state = {
+    gold: parseInt(localStorage.getItem('nd_gold')) || 0,
+    hiWave: parseInt(localStorage.getItem('nd_hi_wave')) || 1,
+    speed: 0, turbo: 0, wave: 1,
+    activeCar: 0, posX: window.innerWidth / 2,
+    isTurbo: false, isOver: false, inGame: false
+};
+
+const cars = [
+    { id: 0, name: "Rusty", top: 12, acc: 0.04, hand: 5, color: "#444", price: 0 },
+    { id: 1, name: "Neon-G", top: 20, acc: 0.08, hand: 8, color: "#00f2ff", price: 500 },
+    { id: 2, name: "Pink-R", top: 28, acc: 0.12, hand: 10, color: "#ff007f", price: 2000 },
+    { id: 3, name: "Viper", top: 38, acc: 0.16, hand: 12, color: "#00ff44", price: 6000 },
+    { id: 4, name: "Interceptor", top: 50, acc: 0.22, hand: 14, color: "#ffff00", price: 15000 },
+    { id: 5, name: "Shadow", top: 65, acc: 0.30, hand: 16, color: "#bc13fe", price: 40000 },
+    { id: 6, name: "Apex", top: 85, acc: 0.45, hand: 20, color: "#ff4400", price: 100000 },
+    { id: 7, name: "ZENITH", top: 120, acc: 0.70, hand: 28, color: "white", price: 250000 }
+];
+
+let keys = {}, entities = [], roadPos = 0, lastSpawn = 0, waveTimer = 0;
+
+function startGame() {
+    state.inGame = true; state.isOver = false; state.speed = 0; state.wave = 1; state.turbo = 0;
+    state.posX = window.innerWidth / 2;
+    entities.forEach(e => e.el.remove()); entities = [];
+    document.getElementById('menuScreen').style.display = 'none';
+    document.getElementById('gameOverScreen').style.display = 'none';
+    document.getElementById('gameArea').style.display = 'block';
+    updateCarVisuals();
+    nextWaveEffect();
+    requestAnimationFrame(loop);
+}
+
+function exitToMenu() {
+    state.inGame = false;
+    document.getElementById('gameArea').style.display = 'none';
+    document.getElementById('gameOverScreen').style.display = 'none';
+    document.getElementById('garageScreen').style.display = 'none';
+    document.getElementById('menuScreen').style.display = 'flex';
+}
+
+function openGarage() {
+    document.getElementById('menuScreen').style.display = 'none';
+    document.getElementById('garageScreen').style.display = 'flex';
+    renderShop();
+}
+
+function closeGarage() {
+    document.getElementById('garageScreen').style.display = 'none';
+    document.getElementById('menuScreen').style.display = 'flex';
+}
+
+function loop() {
+    if(!state.inGame || state.isOver) return;
+
+    const curCar = cars[state.activeCar];
+    
+    // LENKUNG (Physik basierend auf Car Handling)
+    if(keys['a'] || keys['ArrowLeft']) {
+        state.posX -= curCar.hand;
+        player.style.transform = "translateX(-50%) rotate(-12deg) skewX(-2deg)";
+    } else if(keys['d'] || keys['ArrowRight']) {
+        state.posX += curCar.hand;
+        player.style.transform = "translateX(-50%) rotate(12deg) skewX(2deg)";
+    } else {
+        player.style.transform = "translateX(-50%) rotate(0deg)";
+    }
+
+    // GESCHWINDIGKEIT
+    let maxT = (state.isTurbo ? curCar.top * 1.8 : curCar.top) + (state.wave * 3);
+    if(state.speed < maxT) state.speed += curCar.acc;
+    else state.speed -= 0.1;
+
+    if(state.isTurbo) {
+        state.turbo -= 0.7;
+        if(state.turbo <= 0) { state.isTurbo = false; gameArea.classList.remove('motion-blur'); }
+    }
+
+    // WELLE STEIGERN
+    waveTimer++;
+    if(waveTimer > 1500) { state.wave++; waveTimer = 0; nextWaveEffect(); }
+
+    roadPos += state.speed;
+    road.style.backgroundPositionY = roadPos + "px";
+
+    // ENTITY LOGIK
+    for(let i = entities.length-1; i >= 0; i--) {
+        let e = entities[i];
+        
+        // GOLD ist jetzt viel leichter einzusammeln (bewegt sich nur mit 40% Speed)
+        let fallSpeed = (e.type === 'gold') ? state.speed * 0.4 : state.speed;
+        if(e.type === 'rival') fallSpeed = state.speed * 0.6; // Rivalen sind auch langsamer als die Straße
+
+        e.y += fallSpeed;
+        e.el.style.top = e.y + "px";
+
+        const pR = player.getBoundingClientRect();
+        const eR = e.el.getBoundingClientRect();
+
+        // Hitbox Check
+        if(!(pR.right < eR.left || pR.left > eR.right || pR.bottom < eR.top || pR.top > eR.bottom)) {
+            if(e.type === 'rival') die();
+            if(e.type === 'gold') { state.gold += 150; e.el.remove(); entities.splice(i, 1); }
+            if(e.type === 'turbo') { state.turbo = Math.min(100, state.turbo + 45); e.el.remove(); entities.splice(i, 1); }
+        }
+        if(e.y > window.innerHeight + 200) { e.el.remove(); entities.splice(i,1); }
+    }
+
+    // SPAWNING
+    if(Date.now() - lastSpawn > 500) spawn();
+
+    state.posX = Math.max(window.innerWidth/2 - 400, Math.min(window.innerWidth/2 + 400, state.posX));
+    player.style.left = state.posX + "px";
+    
+    // UI
+    speedTxt.innerText = Math.floor(state.speed * 8);
+    goldTxt.innerText = state.gold;
+    waveTxt.innerText = state.wave;
+    turboFill.style.width = state.turbo + "%";
+
+    requestAnimationFrame(loop);
+}
+
+function spawn() {
+    const types = ['rival', 'rival', 'gold', 'gold', 'gold', 'turbo'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const el = document.createElement('div');
+    el.className = type === 'rival' ? 'rival' : (type === 'gold' ? 'gold' : 'turbo-item');
+    if(type === 'gold') el.innerHTML = "$";
+    if(type === 'rival') el.style.backgroundColor = `hsl(${Math.random()*360}, 70%, 50%)`;
+    
+    const x = (window.innerWidth/2 - 380) + Math.random() * 760;
+    el.style.left = x + "px"; el.style.top = "-200px";
+    gameArea.appendChild(el);
+    entities.push({ el, y: -200, type });
+    lastSpawn = Date.now();
+}
+
+function nextWaveEffect() {
+    const banner = document.getElementById('waveBanner');
+    banner.innerText = "WELLE " + state.wave;
+    banner.classList.add('wave-anim');
+    setTimeout(() => banner.classList.remove('wave-anim'), 2500);
+}
+
+function renderShop() {
+    shopGrid.innerHTML = "";
+    garageGold.innerText = state.gold;
+    cars.forEach(c => {
+        const owned = localStorage.getItem('nd_car_'+c.id) || c.price === 0;
+        const card = document.createElement('div');
+        card.className = `car-card ${state.activeCar == c.id ? 'selected' : ''}`;
+        card.innerHTML = `<div style="width:25px;height:45px;background:${c.color};margin:10px auto;border-radius:4px;border:1px solid white"></div>
+            <b style="font-size:16px">${c.name}</b><br>
+            <span style="color:var(--neon-blue)">SPEED: ${c.top*8}</span><br>
+            <span style="color:var(--neon-pink)">HAND: ${c.hand}</span><br>
+            <button class="btn" style="padding:8px; font-size:10px; width:100%; margin-top:10px">${owned ? 'WÄHLEN' : c.price + ' G'}</button>`;
+        card.onclick = () => {
+            if(owned) { state.activeCar = c.id; renderShop(); }
+            else if(state.gold >= c.price) {
+                state.gold -= c.price;
+                localStorage.setItem('nd_car_'+c.id, "true");
+                localStorage.setItem('nd_gold', state.gold);
+                renderShop();
+            }
+        };
+        shopGrid.appendChild(card);
+    });
+}
+
+function updateCarVisuals() {
+    player.style.backgroundColor = cars[state.activeCar].color;
+    player.style.boxShadow = `0 0 40px ${cars[state.activeCar].color}`;
+}
+
+function die() {
+    state.isOver = true;
+    localStorage.setItem('nd_gold', state.gold);
+    if(state.wave > state.hiWave) localStorage.setItem('nd_hi_wave', state.wave);
+    document.getElementById('gameOverScreen').style.display = 'flex';
+    document.getElementById('statsTxt').innerText = `DU BIST IN WELLE ${state.wave} GECRASHT!`;
+}
+
+window.onkeydown = e => {
+    keys[e.key] = true;
+    if(e.key === 'Escape') exitToMenu();
+    if(e.key === ' ' && state.turbo > 10 && !state.isTurbo) { state.isTurbo = true; gameArea.classList.add('motion-blur'); }
+};
+window.onkeyup = e => keys[e.key] = false;
+</script>
+</body>
+</html>
