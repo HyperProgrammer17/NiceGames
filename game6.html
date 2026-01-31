@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>FPE:S ULTIMATE EXAM SIMULATOR</title>
+    <style>
+        :root {
+            --paper: #f2f2e9;
+            --ink: #121212;
+            --blood: #8a0000;
+        }
+
+        body {
+            background-color: #000;
+            color: var(--ink);
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+
+        /* Hintergrund-Effekt */
+        #vignette {
+            position: fixed;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 40%, black 150%);
+            z-index: 5; pointer-events: none;
+        }
+
+        /* Das Papier */
+        #exam-sheet {
+            width: 450px;
+            height: 600px;
+            background: var(--paper);
+            padding: 40px;
+            position: relative;
+            box-shadow: 5px 5px 20px rgba(0,0,0,0.5);
+            transform: rotateX(5deg);
+            transition: all 0.1s;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #ccc;
+        }
+
+        .sketch-effect {
+            animation: jitter 0.15s infinite;
+        }
+
+        @keyframes jitter {
+            0% { transform: translate(0,0) rotate(-0.5deg); }
+            50% { transform: translate(1px, 1px) rotate(0.5deg); }
+            100% { transform: translate(-1px, 0) rotate(-0.5deg); }
+        }
+
+        h2 { text-decoration: underline; text-align: center; letter-spacing: 3px; }
+
+        #question-container {
+            margin-top: 50px;
+            flex-grow: 1;
+        }
+
+        .q-text { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+
+        input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid var(--ink);
+            font-size: 2rem;
+            font-family: 'Comic Sans MS', cursive; /* Simuliert Handschrift */
+            color: #2b30ab;
+            outline: none;
+        }
+
+        #timer-wrap {
+            width: 100%;
+            height: 10px;
+            border: 2px solid var(--ink);
+            margin-top: 20px;
+        }
+
+        #timer-fill {
+            width: 100%;
+            height: 100%;
+            background: var(--ink);
+            transition: width 0.1s linear;
+        }
+
+        /* Boss Mode Style */
+        .boss-mode {
+            background-color: var(--blood) !important;
+            color: white !important;
+        }
+        .boss-mode input {
+            color: white !important;
+            border-bottom-color: white !important;
+        }
+
+        #level-counter {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-weight: bold;
+        }
+
+        .death-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            color: red;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 5rem;
+            z-index: 100;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="vignette"></div>
+<div id="death">GESCHEITERT.<br><span style="font-size: 1rem;">Miss Circle hat dich gefunden.</span></div>
+
+<div id="exam-sheet" class="sketch-effect">
+    <div id="level-counter">Aufgabe: 1/7</div>
+    <h2>STRENG GEHEIM</h2>
+    
+    <div id="question-container">
+        <div class="q-text" id="display-q">Löse: 5 + 3</div>
+        <input type="text" id="answer-box" autofocus>
+        <p id="hint" style="margin-top: 20px; font-size: 0.8rem; opacity: 0.6;">Schreib die Antwort...</p>
+    </div>
+
+    <div id="timer-wrap">
+        <div id="timer-fill"></div>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { q: "5 + 3", a: "8" },
+        { q: "12 - 4", a: "8" },
+        { q: "9 x 3", a: "27" },
+        { q: "64 / 8", a: "8" },
+        { q: "15 + 25", a: "40" },
+        { q: "7 x 7", a: "49" },
+        { q: "2 + 2", a: "8", boss: true } // FINAL BOSS AUFGABE
+    ];
+
+    let currentIdx = 0;
+    let time = 100;
+    let gameActive = true;
+    let timeStep = 0.4;
+
+    const paper = document.getElementById('exam-sheet');
+    const displayQ = document.getElementById('display-q');
+    const answerBox = document.getElementById('answer-box');
+    const timerFill = document.getElementById('timer-fill');
+    const levelCounter = document.getElementById('level-counter');
+    const deathScreen = document.getElementById('death');
+
+    function nextQuestion() {
+        currentIdx++;
+        if (currentIdx >= questions.length) {
+            winGame();
+            return;
+        }
+
+        const next = questions[currentIdx];
+        displayQ.innerText = `Löse: ${next.q}`;
+        answerBox.value = "";
+        levelCounter.innerText = `Aufgabe: ${currentIdx + 1}/7`;
+        
+        // Schwierigkeit erhöhen
+        time = 100;
+        timeStep += 0.2;
+
+        if (next.boss) {
+            paper.classList.add('boss-mode');
+            document.getElementById('hint').innerText = "WIESO ZITTERST DU?";
+            timeStep = 0.8; // Boss Zeit ist extrem knapp
+        }
+    }
+
+    function winGame() {
+        gameActive = false;
+        paper.innerHTML = "<h1>BESTANDEN.</h1><p>Du darfst die Schule heute lebend verlassen.</p>";
+        paper.style.backgroundColor = "#fff";
+    }
+
+    function gameOver() {
+        gameActive = false;
+        deathScreen.style.display = "flex";
+        setTimeout(() => location.reload(), 3000);
+    }
+
+    // Input Logik
+    answerBox.addEventListener('input', () => {
+        if (!gameActive) return;
+        if (answerBox.value === questions[currentIdx].a) {
+            nextQuestion();
+        }
+    });
+
+    // Game Loop
+    setInterval(() => {
+        if (!gameActive) return;
+
+        time -= timeStep;
+        timerFill.style.width = time + "%";
+
+        // Grafik-Effekt: Papier zittert stärker bei wenig Zeit
+        if (time < 30) {
+            paper.style.animationDuration = "0.05s";
+            timerFill.style.backgroundColor = "red";
+        } else {
+            paper.style.animationDuration = "0.15s";
+            timerFill.style.backgroundColor = currentIdx === 6 ? "white" : "black";
+        }
+
+        if (time <= 0) {
+            gameOver();
+        }
+    }, 50);
+
+</script>
+
+</body>
+</html>
