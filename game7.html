@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Neon Frontier: Pro Edition</title>
+    <title>Neon Frontier: Bugfix Edition</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { --neon: #00f2ff; --neon-pink: #ff0055; --bg: #050505; }
@@ -14,7 +14,7 @@
             z-index: 100; border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(0, 242, 255, 0.3);
         }
 
-        input { padding: 12px; border: 1px solid var(--neon); background: #111; color: var(--neon); margin: 10px 0; width: 250px; border-radius: 5px; }
+        input { padding: 12px; border: 1px solid var(--neon); background: #111; color: var(--neon); margin: 10px 0; width: 250px; border-radius: 5px; outline: none; }
         button { padding: 12px 25px; background: var(--neon); color: #000; border: none; font-weight: bold; cursor: pointer; margin: 5px; border-radius: 5px; transition: 0.3s; }
         button:hover { background: #fff; box-shadow: 0 0 20px #fff; }
         .selected { border: 2px solid white !important; box-shadow: 0 0 15px var(--neon); }
@@ -24,14 +24,14 @@
         #wave-info { top: 20px; right: 20px; text-align: right; display: none; }
         
         .hp-container { width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; margin-top: 5px; border: 1px solid #444; }
-        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0055, #00f2ff); transition: width 0.2s ease-out; }
+        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0055, #00f2ff); transition: width 0.1s linear; }
 
         #inventory { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
         .slot { width: 70px; height: 70px; border: 2px solid #333; background: rgba(20,20,20,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 10px; border-radius: 10px; }
         .slot.active { border-color: var(--neon); box-shadow: 0 0 15px var(--neon); color: #fff; transform: translateY(-5px); }
         
         #chat-container { position: absolute; bottom: 100px; left: 20px; width: 250px; }
-        #chat-window { height: 100px; overflow-y: auto; font-size: 12px; margin-bottom: 5px; color: #ccc; }
+        #chat-window { height: 100px; overflow-y: auto; font-size: 12px; margin-bottom: 5px; color: #ccc; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -39,13 +39,13 @@
     <div id="menu">
         <h1 style="letter-spacing: 8px;">NEON FRONTIER</h1>
         <p>DEINE ID: <span id="my-id" style="color:var(--neon-pink); font-size: 22px;">....</span></p>
-        <input type="text" id="username" placeholder="Dein Name" value="Player1">
+        <input type="text" id="username" placeholder="Dein Name" value="Ace" maxlength="10">
         <div style="margin: 10px;">
             <button id="btn-1v1" onclick="setMode('1v1')" class="selected">1 VS 1</button>
             <button id="btn-coop" onclick="setMode('coop')">COOP SURVIVAL</button>
         </div>
         <input type="text" id="remote-id" placeholder="Partner ID eingeben"><br>
-        <button id="connect-btn" style="width: 100%; background: var(--neon-pink); color: white;">START GAME</button>
+        <button id="connect-btn" style="width: 100%; background: var(--neon-pink); color: white;">START MISSION</button>
     </div>
 
     <div id="player-info" class="ui-panel">
@@ -61,7 +61,7 @@
 
     <div id="chat-container">
         <div id="chat-window"></div>
-        <input type="text" id="chat-input" placeholder="Nachricht..." style="width: 100%; padding: 5px;">
+        <input type="text" id="chat-input" placeholder="ENTER für Chat...">
     </div>
 
     <div id="inventory">
@@ -80,9 +80,9 @@
         canvas.height = window.innerHeight;
 
         const WEAPONS = {
-            1: { name: 'Pistole', dmg: 15, rate: 250, color: '#00f2ff' },
-            2: { name: 'Shotgun', dmg: 10, rate: 700, color: '#ffaa00' },
-            3: { name: 'Messer', dmg: 50, rate: 400, range: 60, color: '#ff0055' },
+            1: { name: 'Pistole', dmg: 10, rate: 200, color: '#00f2ff' },
+            2: { name: 'Shotgun', dmg: 8, rate: 800, color: '#ffaa00' },
+            3: { name: 'Messer', dmg: 40, rate: 300, range: 60, color: '#ff0055' },
             4: { name: 'Wall', hp: 300 }
         };
 
@@ -91,8 +91,8 @@
         let conn;
 
         let gameMode = '1v1';
-        let me = { id: myId, name: 'Pilot', x: 300, y: 300, hp: 100, angle: 0, weapon: 1, lastHit: 0 };
-        let rival = { id: '', name: 'Gegner', x: -1000, y: -1000, hp: 100, angle: 0, weapon: 1, active: false };
+        let me = { id: myId, name: 'Pilot', x: 200, y: 200, hp: 100, angle: 0, weapon: 1, hitTimer: 0 };
+        let rival = { id: '', name: 'Gegner', x: -5000, y: -5000, hp: 100, angle: 0, weapon: 1, active: false, hitTimer: 0 };
         
         let walls = [], bullets = [], enemies = [], particles = [];
         let wave = 0, isHost = false, lastShotTime = 0;
@@ -129,10 +129,17 @@
 
             conn.on('data', data => {
                 if(data.type === 'init') { rival.name = data.name; gameMode = data.mode; if(gameMode === 'coop') document.getElementById('wave-info').style.display = 'block'; }
-                if(data.type === 'sync') { rival.x = data.x; rival.y = data.y; rival.angle = data.angle; rival.hp = data.hp; rival.weapon = data.weapon; }
+                if(data.type === 'sync') { 
+                    rival.x = data.x; rival.y = data.y; rival.angle = data.angle; 
+                    rival.hp = data.hp; rival.weapon = data.weapon; 
+                }
                 if(data.type === 'shot') bullets.push(data.b);
                 if(data.type === 'build') walls.push(data.wall);
-                if(data.type === 'hit') { if(data.id === me.id) { me.hp -= data.dmg; createExplosion(me.x, me.y, '#ff0055'); } }
+                if(data.type === 'hit') { 
+                    me.hp -= data.dmg; 
+                    me.hitTimer = 10; // Flash Effekt
+                    createExplosion(me.x, me.y, '#ff0055');
+                }
                 if(data.type === 'msg') addChat(data.sender, data.txt);
                 if(data.type === 'sync_enemies') enemies = data.enemies;
                 if(data.type === 'sync_wave') wave = data.wave;
@@ -148,8 +155,8 @@
         }
 
         function createExplosion(x, y, col) {
-            for(let i=0; i<8; i++) {
-                particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1.0, col });
+            for(let i=0; i<10; i++) {
+                particles.push({ x, y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 1.0, col });
             }
         }
 
@@ -176,31 +183,29 @@
             const w = WEAPONS[me.weapon];
             if(now - lastShotTime < w.rate) return;
 
-            if(me.weapon === 4) { // Build
+            if(me.weapon === 4) {
                 const wx = Math.floor((me.x + Math.cos(me.angle)*60)/40)*40;
                 const wy = Math.floor((me.y + Math.sin(me.angle)*60)/40)*40;
                 if(!walls.some(wl => wl.x === wx && wl.y === wy)) {
                     const wall = { x: wx, y: wy, hp: w.hp };
                     walls.push(wall); if(conn) conn.send({ type: 'build', wall });
                 }
-            } else if(me.weapon === 3) { // Knife
+            } else if(me.weapon === 3) {
+                // Messer Treffer Check
                 if(gameMode === '1v1' && Math.hypot(me.x - rival.x, me.y - rival.y) < w.range) {
-                    conn.send({ type: 'hit', id: rival.id, dmg: w.dmg });
+                    conn.send({ type: 'hit', dmg: w.dmg });
+                    rival.hitTimer = 10;
                 }
                 enemies.forEach((en, i) => {
-                    if(Math.hypot(me.x - en.x, me.y - en.y) < w.range) {
-                        en.hp -= w.dmg; createExplosion(en.x, en.y, '#ff0000');
-                    }
+                    if(Math.hypot(me.x - en.x, me.y - en.y) < w.range) { en.hp -= w.dmg; createExplosion(en.x, en.y, '#ff0000'); }
                 });
-            } else { // Guns
-                const b = { x: me.x, y: me.y, vx: Math.cos(me.angle)*14, vy: Math.sin(me.angle)*14, owner: me.id, dmg: w.dmg, col: w.color };
-                bullets.push(b); if(conn) conn.send({ type: 'shot', b });
-                if(me.weapon === 2) { // Spread
-                    [-0.2, 0.2].forEach(a => {
-                        const sb = {...b, vx: Math.cos(me.angle+a)*14, vy: Math.sin(me.angle+a)*14};
-                        bullets.push(sb); if(conn) conn.send({ type: 'shot', b: sb });
-                    });
-                }
+            } else {
+                const shoot = (ang) => {
+                    const b = { x: me.x, y: me.y, vx: Math.cos(ang)*15, vy: Math.sin(ang)*15, owner: me.id, dmg: w.dmg, col: w.color };
+                    bullets.push(b); if(conn) conn.send({ type: 'shot', b });
+                };
+                shoot(me.angle);
+                if(me.weapon === 2) { shoot(me.angle-0.15); shoot(me.angle+0.15); }
             }
             lastShotTime = now;
         };
@@ -216,20 +221,19 @@
         function gameLoop() {
             ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width, canvas.height);
             
-            // Grid background
-            ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.beginPath();
+            // Grid
+            ctx.strokeStyle = '#111'; ctx.beginPath();
             for(let x=0; x<canvas.width; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
             for(let y=0; y<canvas.height; y+=50) { ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
             ctx.stroke();
 
-            // Movement & Wall Collision
+            // Collision & Move
             let nx = me.x, ny = me.y;
-            if(keys['w']) ny -= 4; if(keys['s']) ny += 4;
-            if(keys['a']) nx -= 4; if(keys['d']) nx += 4;
-            
-            const isColliding = (tx, ty) => walls.some(w => tx+15 > w.x && tx-15 < w.x+40 && ty+15 > w.y && ty-15 < w.y+40);
-            if(!isColliding(nx, me.y)) me.x = nx;
-            if(!isColliding(me.x, ny)) me.y = ny;
+            if(keys['w']) ny -= 4.5; if(keys['s']) ny += 4.5;
+            if(keys['a']) nx -= 4.5; if(keys['d']) nx += 4.5;
+            const isWall = (tx, ty) => walls.some(w => tx+15 > w.x && tx-15 < w.x+40 && ty+15 > w.y && ty-15 < w.y+40);
+            if(!isWall(nx, me.y)) me.x = nx;
+            if(!isWall(me.x, ny)) me.y = ny;
 
             if(conn) conn.send({ type: 'sync', x: me.x, y: me.y, angle: me.angle, hp: me.hp, weapon: me.weapon });
 
@@ -241,85 +245,79 @@
             });
             ctx.globalAlpha = 1.0;
 
-            // Bullets
+            // Bullets & Hit Detection
             bullets.forEach((b, i) => {
                 b.x += b.vx; b.y += b.vy;
-                ctx.fillStyle = b.col; ctx.shadowBlur = 8; ctx.shadowColor = b.col;
-                ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, 7); ctx.fill();
+                ctx.fillStyle = b.col; ctx.shadowBlur = 10; ctx.shadowColor = b.col;
+                ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, 7); ctx.fill();
                 
-                // Wall Collision
+                // Wall Hit
                 walls.forEach((w, wi) => {
                     if(b.x > w.x && b.x < w.x+40 && b.y > w.y && b.y < w.y+40) {
                         w.hp -= b.dmg; bullets.splice(i, 1);
-                        if(w.hp <= 0) { 
-                            if(conn) conn.send({type:'wall_break', x:w.x, y:w.y});
-                            walls.splice(wi, 1); 
-                        }
+                        if(w.hp <= 0) { if(conn) conn.send({type:'wall_break', x:w.x, y:w.y}); walls.splice(wi, 1); }
                     }
                 });
 
-                // Rival Collision
-                if(gameMode === '1v1' && b.owner === me.id && Math.hypot(rival.x - b.x, rival.y - b.y) < 20) {
-                    conn.send({ type: 'hit', id: rival.id, dmg: b.dmg }); bullets.splice(i, 1);
+                // 1v1 Hit Detection (Berechnet beim Schützen!)
+                if(gameMode === '1v1' && b.owner === me.id && Math.hypot(rival.x - b.x, rival.y - b.y) < 22) {
+                    conn.send({ type: 'hit', dmg: b.dmg }); // Sende Treffer an Gegner
+                    rival.hitTimer = 10; // Visual für mich
+                    bullets.splice(i, 1);
                 }
 
-                // Enemy Collision (Host side only for logic)
+                // Enemy Hit (Host)
                 if(isHost && gameMode === 'coop') {
                     enemies.forEach((en, ei) => {
-                        if(Math.hypot(en.x - b.x, en.y - b.y) < 20) {
+                        if(Math.hypot(en.x - b.x, en.y - b.y) < 22) {
                             en.hp -= b.dmg; bullets.splice(i, 1);
-                            if(en.hp <= 0) { createExplosion(en.x, en.y, '#ff0000'); enemies.splice(ei, 1); }
+                            if(en.hp <= 0) { createExplosion(en.x, en.y, '#f00'); enemies.splice(ei, 1); }
                         }
                     });
                 }
+                
+                if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(i, 1);
             });
 
-            // Smart AI (Host only)
+            // AI (Host)
             if(isHost && gameMode === 'coop') {
                 if(enemies.length === 0) {
                     wave++;
-                    for(let i=0; i<3 + wave*2; i++) {
-                        enemies.push({ x: Math.random()*canvas.width, y: -50, hp: 40 + wave*10, speed: 1.2 + Math.random(), offset: Math.random()*100 });
+                    for(let i=0; i<3+wave*2; i++) {
+                        enemies.push({ x: Math.random()*canvas.width, y: -50, hp: 40+wave*10, speed: 1.5+Math.random(), offset: Math.random()*100 });
                     }
                     conn.send({ type: 'sync_wave', wave });
                 }
-
                 enemies.forEach(en => {
                     const target = Math.hypot(me.x-en.x, me.y-en.y) < Math.hypot(rival.x-en.x, rival.y-en.y) ? me : rival;
-                    const dist = Math.hypot(target.x - en.x, target.y - en.y);
-                    
-                    // Schlaue Bewegung: Umkreisen + Draufgehen
-                    const angle = Math.atan2(target.y - en.y, target.x - en.x);
-                    const orbit = Math.sin(Date.now() * 0.002 + en.offset) * 0.5; // Leichtes Schwanken
-                    
+                    const angle = Math.atan2(target.y-en.y, target.x-en.x);
+                    const orbit = Math.sin(Date.now()*0.003 + en.offset) * 0.4;
                     en.x += Math.cos(angle + orbit) * en.speed;
                     en.y += Math.sin(angle + orbit) * en.speed;
-
-                    // Schaden am Spieler + Repel (Rückstoß)
-                    if(dist < 25) {
-                        me.hp -= 0.5;
-                        me.x += Math.cos(angle) * 10; me.y += Math.sin(angle) * 10; // Knockback
-                    }
+                    if(Math.hypot(me.x-en.x, me.y-en.y) < 25) { me.hp -= 0.4; me.hitTimer = 5; }
                 });
                 conn.send({ type: 'sync_enemies', enemies });
             }
 
-            // Draw Entities
+            // Draw
             walls.forEach(w => {
                 ctx.strokeStyle = varColor('--neon'); ctx.strokeRect(w.x, w.y, 40, 40);
-                ctx.fillStyle = `rgba(0, 242, 255, ${w.hp/300})`; ctx.fillRect(w.x+5, w.y+5, 30, 30);
+                ctx.fillStyle = `rgba(0, 242, 255, ${w.hp/300*0.4})`; ctx.fillRect(w.x+2, w.y+2, 36, 36);
             });
 
             enemies.forEach(en => {
-                ctx.fillStyle = '#ff0000'; ctx.shadowBlur = 10; ctx.shadowColor = 'red';
-                ctx.beginPath(); ctx.arc(en.x, en.y, 12, 0, 7); ctx.fill();
-                ctx.fillStyle = '#fff'; ctx.fillRect(en.x-4, en.y-4, 8, 2); // Auge
+                ctx.fillStyle = '#ff0000'; ctx.shadowBlur = 15; ctx.shadowColor = 'red';
+                ctx.beginPath(); ctx.arc(en.x, en.y, 13, 0, 7); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.fillRect(en.x-4, en.y-4, 8, 2);
             });
 
             drawPlayer(me, '#00f2ff');
             if(rival.active) drawPlayer(rival, '#ff0055');
 
-            if(me.hp <= 0) { alert("GAME OVER"); location.reload(); }
+            if(me.hp <= 0) { alert("MISSION FEHLGESCHLAGEN!"); location.reload(); }
+            
+            if(me.hitTimer > 0) me.hitTimer--;
+            if(rival.hitTimer > 0) rival.hitTimer--;
             
             ctx.shadowBlur = 0;
             updateUI();
@@ -328,12 +326,14 @@
 
         function drawPlayer(p, col) {
             ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
-            ctx.shadowBlur = 15; ctx.shadowColor = col;
-            ctx.fillStyle = col;
-            ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-12, -12); ctx.lineTo(-12, 12); ctx.closePath(); ctx.fill();
-            ctx.fillStyle = '#fff'; ctx.fillRect(10, -2, 10, 4); // Waffe
+            // Flash white when hit
+            const drawCol = p.hitTimer > 0 ? '#fff' : col;
+            ctx.shadowBlur = 20; ctx.shadowColor = drawCol;
+            ctx.fillStyle = drawCol;
+            ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-12, -14); ctx.lineTo(-12, 14); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.fillRect(10, -2, 12, 4);
             ctx.restore();
-            ctx.fillStyle = '#fff'; ctx.font = "12px Arial"; ctx.textAlign = "center"; ctx.fillText(p.name, p.x, p.y - 30);
+            ctx.fillStyle = '#fff'; ctx.font = "bold 13px Arial"; ctx.textAlign = "center"; ctx.fillText(p.name, p.x, p.y - 35);
         }
 
         function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
