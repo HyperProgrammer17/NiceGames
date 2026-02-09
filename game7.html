@@ -8,11 +8,11 @@
         :root { --neon: #00f2ff; --neon-pink: #ff0055; --bg: #050505; }
         body { margin: 0; background: var(--bg); color: var(--neon); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        /* Menü & Overlays */
+        /* Overlays (Menü & Winner) */
         .overlay { 
-            background: rgba(5, 5, 5, 0.9); padding: 50px; border: 2px solid var(--neon); 
+            background: rgba(10, 10, 10, 0.95); padding: 40px; border: 2px solid var(--neon); 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            z-index: 100; border-radius: 20px; text-align: center; box-shadow: 0 0 60px rgba(0, 242, 255, 0.4);
+            z-index: 100; border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(0, 242, 255, 0.3);
         }
 
         #winner-screen { display: none; border-color: var(--neon-pink); box-shadow: 0 0 60px rgba(255, 0, 85, 0.4); }
@@ -22,7 +22,7 @@
         button:hover { background: #fff; box-shadow: 0 0 20px #fff; transform: scale(1.05); }
         .selected { border: 2px solid white !important; box-shadow: 0 0 15px var(--neon); }
 
-        /* UI */
+        /* UI Elemente */
         .ui-panel { position: absolute; padding: 15px; background: rgba(0,0,0,0.8); border: 1px solid var(--neon); border-radius: 10px; pointer-events: none; z-index: 10; }
         #player-info { top: 20px; left: 20px; width: 200px; }
         #wave-info { top: 20px; right: 20px; text-align: right; display: none; }
@@ -35,29 +35,28 @@
         .slot.active { border-color: var(--neon); box-shadow: 0 0 15px var(--neon); color: #fff; transform: translateY(-5px); }
         
         #chat-container { position: absolute; bottom: 100px; left: 20px; width: 250px; }
-        #chat-window { height: 80px; overflow-y: auto; font-size: 11px; margin-bottom: 5px; color: #ccc; pointer-events: none; }
-        
-        canvas { display: block; }
+        #chat-window { height: 100px; overflow-y: auto; font-size: 12px; margin-bottom: 5px; color: #ccc; pointer-events: none; }
+        #chat-input { width: 100%; background: #111; border: 1px solid #333; color: white; padding: 8px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
     <div id="menu" class="overlay">
-        <h1 style="letter-spacing: 10px; margin: 0 0 20px 0;">NEON FRONTIER</h1>
-        <p>DEINE ID: <span id="my-id" style="color:var(--neon-pink); font-size: 24px; font-weight: bold;">....</span></p>
+        <h1 style="letter-spacing: 8px;">NEON FRONTIER</h1>
+        <p>DEINE ID: <span id="my-id" style="color:var(--neon-pink); font-size: 22px;">....</span></p>
         <input type="text" id="username" placeholder="Dein Name" value="Ace" maxlength="10">
-        <div style="margin: 15px;">
+        <div style="margin: 10px;">
             <button id="btn-1v1" onclick="setMode('1v1')" class="selected">1 VS 1</button>
             <button id="btn-coop" onclick="setMode('coop')">COOP SURVIVAL</button>
         </div>
         <input type="text" id="remote-id" placeholder="Partner ID eingeben"><br>
-        <button id="connect-btn" style="width: 100%; background: var(--neon-pink); color: white; margin-top: 10px;">START MISSION</button>
+        <button id="connect-btn" style="width: 100%; background: var(--neon-pink); color: white;">START MISSION</button>
     </div>
 
     <div id="winner-screen" class="overlay">
-        <h1 id="win-text" style="font-size: 48px; margin-bottom: 10px;">VICTORY</h1>
-        <p id="win-subtext" style="font-size: 20px; color: white; margin-bottom: 30px;">Spieler hat gewonnen!</p>
-        <button onclick="location.reload()" style="background: var(--neon); color: #000; padding: 15px 40px;">ZURÜCK ZUM MENÜ</button>
+        <h1 id="win-text" style="font-size: 48px; margin-bottom: 10px;">MISSION END</h1>
+        <p id="win-subtext" style="font-size: 20px; margin-bottom: 30px;">Details...</p>
+        <button onclick="location.reload()" style="width: 100%; background: var(--neon); color: #000;">ZURÜCK ZUM MENÜ</button>
     </div>
 
     <div id="player-info" class="ui-panel">
@@ -73,7 +72,7 @@
 
     <div id="chat-container">
         <div id="chat-window"></div>
-        <input type="text" id="chat-input" placeholder="Nachricht..." style="width: 100%; background: #111; border: 1px solid #333; color: white; padding: 5px; border-radius: 4px;">
+        <input type="text" id="chat-input" placeholder="ENTER für Chat...">
     </div>
 
     <div id="inventory">
@@ -104,7 +103,7 @@
 
         let gameMode = '1v1';
         let gameOver = false;
-        let me = { id: myId, name: 'Pilot', x: 200, y: 300, hp: 100, angle: 0, weapon: 1, hitTimer: 0 };
+        let me = { id: myId, name: 'Pilot', x: 200, y: 200, hp: 100, angle: 0, weapon: 1, hitTimer: 0 };
         let rival = { id: '', name: 'Gegner', x: -5000, y: -5000, hp: 100, angle: 0, weapon: 1, active: false, hitTimer: 0 };
         
         let walls = [], bullets = [], enemies = [], particles = [];
@@ -124,7 +123,7 @@
             const rId = document.getElementById('remote-id').value;
             if(!rId) return;
             me.name = document.getElementById('username').value || "Pilot";
-            conn = peer.connect('NF-' + rId); // Sicherstellen, dass das Prefix NF- genutzt wird
+            conn = peer.connect(rId);
             isHost = false;
             setupConn();
         };
@@ -142,7 +141,10 @@
 
             conn.on('data', data => {
                 if(data.type === 'init') { rival.name = data.name; gameMode = data.mode; if(gameMode === 'coop') document.getElementById('wave-info').style.display = 'block'; }
-                if(data.type === 'sync') { rival.x = data.x; rival.y = data.y; rival.angle = data.angle; rival.hp = data.hp; rival.weapon = data.weapon; }
+                if(data.type === 'sync') { 
+                    rival.x = data.x; rival.y = data.y; rival.angle = data.angle; 
+                    rival.hp = data.hp; rival.weapon = data.weapon; 
+                }
                 if(data.type === 'shot') bullets.push(data.b);
                 if(data.type === 'build') walls.push(data.wall);
                 if(data.type === 'hit') { 
@@ -160,20 +162,21 @@
         }
 
         function endGame(winnerName) {
+            if(gameOver) return;
             gameOver = true;
             const screen = document.getElementById('winner-screen');
             const winText = document.getElementById('win-text');
             const subText = document.getElementById('win-subtext');
             
             screen.style.display = 'block';
-            if(gameMode === 'coop') {
+            if(gameMode === 'coop' && winnerName === "DROIDEN") {
                 winText.innerText = "MISSION FAILED";
                 winText.style.color = "var(--neon-pink)";
-                subText.innerText = "Die Droiden haben die Basis überrannt.";
+                subText.innerText = "Die Basis wurde überrannt.";
             } else {
-                winText.innerText = winnerName === me.name ? "VICTORY" : "DEFEAT";
-                winText.style.color = winnerName === me.name ? "var(--neon)" : "var(--neon-pink)";
-                subText.innerText = winnerName + " ist der Champion!";
+                winText.innerText = (winnerName === me.name) ? "VICTORY" : "DEFEAT";
+                winText.style.color = (winnerName === me.name) ? "var(--neon)" : "var(--neon-pink)";
+                subText.innerText = winnerName + " hat die Schlacht gewonnen!";
             }
         }
 
@@ -190,7 +193,6 @@
             }
         }
 
-        // Steuerung
         window.onkeydown = e => {
             if(document.activeElement.id === 'chat-input') {
                 if(e.key === 'Enter') {
@@ -225,14 +227,17 @@
                 if(gameMode === '1v1' && Math.hypot(me.x - rival.x, me.y - rival.y) < w.range) {
                     conn.send({ type: 'hit', dmg: w.dmg });
                     rival.hitTimer = 10;
-                    if(rival.hp - w.dmg <= 0) { endGame(me.name); conn.send({type:'game_over', winner: me.name}); }
+                    if(rival.hp - w.dmg <= 0) { 
+                        endGame(me.name); 
+                        conn.send({ type: 'game_over', winner: me.name }); 
+                    }
                 }
                 enemies.forEach((en, i) => {
                     if(Math.hypot(me.x - en.x, me.y - en.y) < w.range) { en.hp -= w.dmg; createExplosion(en.x, en.y, '#ff0000'); }
                 });
             } else {
                 const shoot = (ang) => {
-                    const b = { x: me.x, y: me.y, vx: Math.cos(ang)*16, vy: Math.sin(ang)*16, owner: me.id, dmg: w.dmg, col: w.color };
+                    const b = { x: me.x, y: me.y, vx: Math.cos(ang)*15, vy: Math.sin(ang)*15, owner: me.id, dmg: w.dmg, col: w.color };
                     bullets.push(b); if(conn) conn.send({ type: 'shot', b });
                 };
                 shoot(me.angle);
@@ -251,7 +256,6 @@
 
         function gameLoop() {
             if(gameOver) return;
-
             ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width, canvas.height);
             
             // Grid
@@ -262,8 +266,8 @@
 
             // Collision & Move
             let nx = me.x, ny = me.y;
-            if(keys['w']) ny -= 5; if(keys['s']) ny += 5;
-            if(keys['a']) nx -= 5; if(keys['d']) nx += 5;
+            if(keys['w']) ny -= 4.5; if(keys['s']) ny += 4.5;
+            if(keys['a']) nx -= 4.5; if(keys['d']) nx += 4.5;
             const isWall = (tx, ty) => walls.some(w => tx+15 > w.x && tx-15 < w.x+40 && ty+15 > w.y && ty-15 < w.y+40);
             if(!isWall(nx, me.y)) me.x = nx;
             if(!isWall(me.x, ny)) me.y = ny;
@@ -276,7 +280,6 @@
                 ctx.fillStyle = b.col; ctx.shadowBlur = 10; ctx.shadowColor = b.col;
                 ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, 7); ctx.fill();
                 
-                // Wall Hit
                 walls.forEach((w, wi) => {
                     if(b.x > w.x && b.x < w.x+40 && b.y > w.y && b.y < w.y+40) {
                         w.hp -= b.dmg; bullets.splice(i, 1);
@@ -284,15 +287,16 @@
                     }
                 });
 
-                // 1v1 Hit
                 if(gameMode === '1v1' && b.owner === me.id && Math.hypot(rival.x - b.x, rival.y - b.y) < 22) {
                     conn.send({ type: 'hit', dmg: b.dmg });
                     rival.hitTimer = 10;
                     bullets.splice(i, 1);
-                    if(rival.hp - b.dmg <= 0) { endGame(me.name); conn.send({type:'game_over', winner: me.name}); }
+                    if(rival.hp - b.dmg <= 0) { 
+                        endGame(me.name); 
+                        conn.send({ type: 'game_over', winner: me.name }); 
+                    }
                 }
 
-                // AI Hit (Host)
                 if(isHost && gameMode === 'coop') {
                     enemies.forEach((en, ei) => {
                         if(Math.hypot(en.x - b.x, en.y - b.y) < 22) {
@@ -317,16 +321,17 @@
                 if(enemies.length === 0) {
                     wave++;
                     for(let i=0; i<3+wave*2; i++) {
-                        enemies.push({ x: Math.random()*canvas.width, y: -50, hp: 40+wave*10, speed: 1.8+Math.random(), offset: Math.random()*100 });
+                        enemies.push({ x: Math.random()*canvas.width, y: -50, hp: 40+wave*10, speed: 1.5+Math.random(), offset: Math.random()*100 });
                     }
                     conn.send({ type: 'sync_wave', wave });
                 }
                 enemies.forEach(en => {
                     const target = Math.hypot(me.x-en.x, me.y-en.y) < Math.hypot(rival.x-en.x, rival.y-en.y) ? me : rival;
                     const angle = Math.atan2(target.y-en.y, target.x-en.x);
-                    en.x += Math.cos(angle) * en.speed; en.y += Math.sin(angle) * en.speed;
+                    en.x += Math.cos(angle) * en.speed;
+                    en.y += Math.sin(angle) * en.speed;
                     if(Math.hypot(me.x-en.x, me.y-en.y) < 25) { 
-                        me.hp -= 0.5; me.hitTimer = 5; 
+                        me.hp -= 0.4; me.hitTimer = 5; 
                         if(me.hp <= 0) { endGame("DROIDEN"); conn.send({type:'game_over', winner: "DROIDEN"}); }
                     }
                 });
@@ -364,8 +369,6 @@
             ctx.restore();
             ctx.fillStyle = '#fff'; ctx.font = "bold 13px Arial"; ctx.textAlign = "center"; ctx.fillText(p.name, p.x, p.y - 35);
         }
-
-        window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     </script>
 </body>
 </html>
