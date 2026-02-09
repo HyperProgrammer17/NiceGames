@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Frontier: Build & Brawl</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; background: #080808; color: #00f2ff; font-family: 'Press Start 2P', cursive; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap'); /* Retro Font */
+        
+        #menu, #game-over { background: rgba(0,0,0,0.9); padding: 25px; border: 3px solid #00f2ff; position: absolute; top: 15%; z-index: 10; border-radius: 15px; text-align: center; box-shadow: 0 0 30px #00f2ff; }
+        #game-over { display: none; }
+        canvas { background: #000; border: 2px solid #333; cursor: crosshair; }
+        input { padding: 10px; border: 1px solid #00f2ff; background: #222; color: #00f2ff; margin: 8px; font-family: 'Press Start 2P', cursive; font-size: 14px; }
+        button { padding: 12px 25px; background: #00f2ff; color: #000; border: none; font-weight: bold; cursor: pointer; font-family: 'Press Start 2P', cursive; font-size: 16px; margin-top: 10px; }
+        button:hover { background: #ff0055; color: #fff; box-shadow: 0 0 15px #ff0055; }
+        
+        .ui-panel { position: absolute; padding: 10px; background: rgba(0,0,0,0.7); border: 1px solid #00f2ff; border-radius: 5px; font-size: 12px; }
+        #player-info { top: 10px; left: 10px; }
+        #chat-window { bottom: 10px; left: 10px; width: 300px; height: 150px; overflow-y: scroll; text-align: left; }
+        #chat-input-container { bottom: 10px; left: 10px; width: 300px; }
+        #chat-input { width: calc(100% - 70px); }
+        #send-chat { width: 60px; padding: 5px; margin-left: 5px; }
+
+        .weapon-slot { display: inline-block; width: 60px; height: 60px; border: 2px solid #333; margin: 5px; background: #1a1a1a; vertical-align: middle; line-height: 60px; font-size: 10px; text-align: center; }
+        .weapon-slot.active { border-color: #00f2ff; box-shadow: 0 0 10px #00f2ff; }
+        .weapon-slot img { max-width: 50px; max-height: 50px; vertical-align: middle; }
+        #inventory { position: absolute; bottom: 10px; right: 10px; }
+
+        .chat-message { margin-bottom: 5px; }
+        .chat-message .player { color: #00f2ff; }
+        .chat-message .opponent { color: #ff0055; }
+    </style>
+</head>
+<body>
+
+    <div id="menu">
+        <h2>NEON FRONTIER</h2>
+        <p>Deine ID: <b id="my-id">Wird geladen...</b></p>
+        <input type="text" id="username" placeholder="Dein Name" value="Spieler" maxlength="12">
+        <input type="text" id="remote-id" placeholder="Partner ID eingeben">
+        <button id="connect-btn">MIT FREUND VERBINDEN</button>
+        <p><small>WASD zum Bewegen, Maus zum Zielen/Schießen/Bauen<br>1-3 für Waffen, E für Baumodus</small></p>
+    </div>
+
+    <div id="game-over">
+        <h1>GAME OVER!</h1>
+        <p id="game-over-message"></p>
+        <button onclick="location.reload()">NEU STARTEN</button>
+    </div>
+
+    <div id="player-info" class="ui-panel">
+        <div>Name: <span id="my-name-display"></span></div>
+        <div>HP: <span id="my-hp">100</span></div>
+        <div>Munition: <span id="ammo-display">∞</span></div>
+        <div>Modus: <span id="mode-display">Kampf</span></div>
+    </div>
+
+    <div id="inventory" class="ui-panel">
+        <div class="weapon-slot" id="slot-1" data-weapon="pistol">Pistole</div>
+        <div class="weapon-slot" id="slot-2" data-weapon="shotgun">Shotgun</div>
+        <div class="weapon-slot" id="slot-3" data-weapon="knife">Messer</div>
+        <div class="weapon-slot" id="slot-4" data-weapon="wall">Wand</div>
+    </div>
+
+    <div id="chat-window" class="ui-panel"></div>
+    <div id="chat-input-container" class="ui-panel">
+        <input type="text" id="chat-input" placeholder="Nachricht eingeben...">
+        <button id="send-chat">Senden</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const myIdDisplay = document.getElementById('my-id');
+        const usernameInput = document.getElementById('username');
+        const remoteIdInput = document.getElementById('remote-id');
+        const connectBtn = document.getElementById('connect-btn');
+        const menu = document.getElementById('menu');
+        const gameOverScreen = document.getElementById('game-over');
+        const gameOverMessage = document.getElementById('game-over-message');
+
+        const myNameDisplay = document.getElementById('my-name-display');
+        const myHpDisplay = document.getElementById('my-hp');
+        const ammoDisplay = document.getElementById('ammo-display');
+        const modeDisplay = document.getElementById('mode-display');
+        const chatWindow = document.getElementById('chat-window');
+        const chatInput = document.getElementById('chat-input');
+        const sendChatBtn = document.getElementById('send-chat');
+
+        const slots = {
+            '1': document.getElementById('slot-1'),
+            '2': document.getElementById('slot-2'),
+            '3': document.getElementById('slot-3'),
+            '4': document.getElementById('slot-4'),
+        };
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // --- Game State ---
+        let myPlayer = { id: '', name: 'Player1', x: 100, y: 100, size: 30, color: '#00f2ff', hp: 100, angle: 0, currentWeapon: 'pistol', buildMode: false };
+        let opponentPlayer = { id: '', name: 'Player2', x: -100, y: -100, size: 30, color: '#ff0055', hp: 100, angle: 0, currentWeapon: 'pistol', buildMode: false, active: false };
+        
+        let bullets = [];
+        let walls = []; // { x, y, hp, ownerId }
+
+        const keys = {};
+        const mouse = { x: 0, y: 0, down: false };
+
+        const WEAPONS = {
+            pistol: { damage: 10, range: 400, firerate: 200, ammo: Infinity },
+            shotgun: { damage: 25, range: 200, firerate: 800, ammo: 10 },
+            knife: { damage: 50, range: 30, firerate: 500, ammo: Infinity },
+            wall: { hp: 100 }
+        };
+
+        let lastShotTime = 0;
+        let selectedSlot = '1';
+
+        // --- PeerJS Setup ---
+        const peer = new Peer(); 
+        let connection;
+        let gameRunning = false;
+
+        peer.on('open', (id) => {
+            myPlayer.id = id;
+            myIdDisplay.innerText = id;
+            usernameInput.value = myPlayer.name;
+            updateUI();
+        });
+
+        peer.on('connection', (conn) => {
+            setupConnection(conn);
+            menu.style.display = 'none';
+        });
+
+        connectBtn.onclick = () => {
+            myPlayer.name = usernameInput.value || "Spieler";
+            myHpDisplay.innerText = myPlayer.hp;
+            myNameDisplay.innerText = myPlayer.name;
+
+            const id = remoteIdInput.value;
+            if (id) {
+                setupConnection(peer.connect(id));
+                menu.style.display = 'none';
+            }
+        };
+
+        function setupConnection(conn) {
+            connection = conn;
+            opponentPlayer.active = true;
+            
+            connection.on('open', () => {
+                gameRunning = true;
+                sendInitialState(); // Sende meinen Zustand an den Gegner
+                gameLoop();
+            });
+
+            connection.on('data', (data) => {
+                if (data.type === 'initial_state') {
+                    opponentPlayer.id = data.player.id;
+                    opponentPlayer.name = data.player.name;
+                    opponentPlayer.x = data.player.x;
+                    opponentPlayer.y = data.player.y;
+                    opponentPlayer.hp = data.player.hp;
+                    opponentPlayer.angle = data.player.angle;
+                    opponentPlayer.currentWeapon = data.player.currentWeapon;
+                } else if (data.type === 'player_update') {
+                    opponentPlayer.x = data.x;
+                    opponentPlayer.y = data.y;
+                    opponentPlayer.angle = data.angle;
+                    opponentPlayer.hp = data.hp;
+                    opponentPlayer.currentWeapon = data.currentWeapon;
+                    opponentPlayer.buildMode = data.buildMode; // Sync build mode
+                } else if (data.type === 'bullet_fire') {
+                    bullets.push({ ...data.bullet, ownerId: opponentPlayer.id });
+                } else if (data.type === 'hit') {
+                    if (data.targetId === myPlayer.id) {
+                        myPlayer.hp -= data.damage;
+                        if (myPlayer.hp <= 0) {
+                            endGame(opponentPlayer.name);
+                        }
+                    }
+                } else if (data.type === 'build_wall') {
+                    walls.push(data.wall);
+                } else if (data.type === 'destroy_wall') {
+                    walls = walls.filter(w => !(w.x === data.x && w.y === data.y));
+                } else if (data.type === 'chat_message') {
+                    displayChatMessage(data.sender, data.message, opponentPlayer.color);
+                }
+                updateUI();
+            });
+
+            connection.on('close', () => {
+                gameOverMessage.innerText = "Dein Gegner hat die Verbindung getrennt. Du gewinnst!";
+                gameOverScreen.style.display = 'flex';
+                gameRunning = false;
+            });
+        }
+
+        function sendInitialState() {
+            if (connection && connection.open) {
+                connection.send({ 
+                    type: 'initial_state', 
+                    player: {
+                        id: myPlayer.id,
+                        name: myPlayer.name,
+                        x: myPlayer.x,
+                        y: myPlayer.y,
+                        hp: myPlayer.hp,
+                        angle: myPlayer.angle,
+                        currentWeapon: myPlayer.currentWeapon
+                    }
+                });
+            }
+        }
+
+        function sendPlayerUpdate() {
+            if (connection && connection.open) {
+                connection.send({
+                    type: 'player_update',
+                    x: myPlayer.x,
+                    y: myPlayer.y,
+                    angle: myPlayer.angle,
+                    hp: myPlayer.hp,
+                    currentWeapon: myPlayer.currentWeapon,
+                    buildMode: myPlayer.buildMode
+                });
+            }
+        }
+
+        function sendBullet(bullet) {
+            if (connection && connection.open) {
+                connection.send({ type: 'bullet_fire', bullet: bullet });
+            }
+        }
+
+        function sendHit(targetId, damage) {
+            if (connection && connection.open) {
+                connection.send({ type: 'hit', targetId, damage });
+            }
+        }
+
+        function sendBuildWall(wall) {
+            if (connection && connection.open) {
+                connection.send({ type: 'build_wall', wall });
+            }
+        }
+
+        function sendDestroyWall(x, y) {
+            if (connection && connection.open) {
+                connection.send({ type: 'destroy_wall', x, y });
+            }
+        }
+
+        function sendChatMessage(message) {
+            if (connection && connection.open) {
+                connection.send({ type: 'chat_message', sender: myPlayer.name, message });
+            }
+        }
+
+        // --- Game Logic ---
+        function update() {
+            if (!gameRunning) return;
+
+            let moved = false;
+            if (keys['w']) { myPlayer.y -= 3; moved = true; }
+            if (keys['s']) { myPlayer.y += 3; moved = true; }
+            if (keys['a']) { myPlayer.x -= 3; moved = true; }
+            if (keys['d']) { myPlayer.x += 3; moved = true; }
+
+            myPlayer.angle = Math.atan2(mouse.y - myPlayer.y, mouse.x - myPlayer.x);
+
+            if (moved) sendPlayerUpdate();
+
+            // Bullets update
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+
+                // Bullet collision with walls
+                walls.forEach((wall, wallIndex) => {
+                    if (bullet.x > wall.x && bullet.x < wall.x + 50 &&
+                        bullet.y > wall.y && bullet.y < wall.y + 50) {
+                        wall.hp -= WEAPONS[bullet.weapon].damage;
+                        bullets.splice(index, 1);
+                        if (wall.hp <= 0) {
+                            walls.splice(wallIndex, 1);
+                            sendDestroyWall(wall.x, wall.y);
+                        }
+                    }
+                });
+
+                // Bullet collision with opponent
+                if (bullet.ownerId === myPlayer.id && opponentPlayer.active &&
+                    bullet.x > opponentPlayer.x && bullet.x < opponentPlayer.x + opponentPlayer.size &&
+                    bullet.y > opponentPlayer.y && bullet.y < opponentPlayer.y + opponentPlayer.size) {
+                    
+                    sendHit(opponentPlayer.id, WEAPONS[bullet.weapon].damage);
+                    bullets.splice(index, 1);
+                }
+
+                // Remove out of bounds bullets
+                if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(index, 1);
+                }
+            });
+
+            // Knife collision (melee)
+            if (myPlayer.currentWeapon === 'knife' && mouse.down && (Date.now() - lastShotTime > WEAPONS.knife.firerate)) {
+                const dist = Math.hypot(opponentPlayer.x - myPlayer.x, opponentPlayer.y - myPlayer.y);
+                if (dist < WEAPONS.knife.range + myPlayer.size / 2 + opponentPlayer.size / 2) {
+                    sendHit(opponentPlayer.id, WEAPONS.knife.damage);
+                    lastShotTime = Date.now();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Walls
+            walls.forEach(wall => {
+                ctx.fillStyle = `rgba(100, 100, 100, ${wall.hp / 100})`;
+                ctx.strokeStyle = '#00f2ff';
+                ctx.lineWidth = 2;
+                ctx.fillRect(wall.x, wall.y, 50, 50);
+                ctx.strokeRect(wall.x, wall.y, 50, 50);
+
+                // Show HP on wall
+                ctx.fillStyle = "#fff";
+                ctx.font = "10px 'Press Start 2P'";
+                ctx.textAlign = "center";
+                ctx.fillText(wall.hp, wall.x + 25, wall.y + 25);
+            });
+
+            // Draw myPlayer
+            drawPlayer(myPlayer);
+            // Draw Opponent
+            if (opponentPlayer.active) {
+                drawPlayer(opponentPlayer);
+            }
+
+            // Draw Bullets
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.ownerId === myPlayer.id ? '#0f0' : '#f00';
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Drawing build preview
+            if (myPlayer.buildMode && myPlayer.currentWeapon === 'wall') {
+                const buildX = Math.floor(mouse.x / 50) * 50;
+                const buildY = Math.floor(mouse.y / 50) * 50;
+                ctx.strokeStyle = 'rgba(0, 242, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(buildX, buildY, 50, 50);
+            }
+        }
+
+        function drawPlayer(p) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle);
+
+            // Health bar
+            ctx.fillStyle = "#333";
+            ctx.fillRect(-20, -25, 40, 5);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-20, -25, (p.hp / 100) * 40, 5);
+
+            // Player body (square)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = p.color;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+
+            // Weapon
+            if (p.currentWeapon === 'pistol') {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(10, -2, 15, 4); // Pistol
+            } else if (p.currentWeapon === 'shotgun') {
+                ctx.fillStyle = '#ff9900';
+                ctx.fillRect(10, -5, 20, 10); // Shotgun
+            } else if (p.currentWeapon === 'knife') {
+                ctx.fillStyle = '#aaa';
+                ctx.fillRect(15, -2, 25, 4); // Knife
+                ctx.beginPath();
+                ctx.moveTo(40, -2);
+                ctx.lineTo(40, 0);
+                ctx.lineTo(35, -5);
+                ctx.fill();
+            }
+
+            // Name
+            ctx.fillStyle = "#fff";
+            ctx.font = "12px 'Press Start 2P'";
+            ctx.textAlign = "center";
+            ctx.fillText(p.name, 0, -40);
+
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners ---
+        window.onkeydown = (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (['1', '2', '3'].includes(e.key)) {
+                myPlayer.currentWeapon = slots[e.key].dataset.weapon;
+                myPlayer.buildMode = false;
+                selectedSlot = e.key;
+                updateUI();
+            } else if (e.key.toLowerCase() === 'e') {
+                myPlayer.buildMode = !myPlayer.buildMode;
+                if(myPlayer.buildMode) {
+                    myPlayer.currentWeapon = 'wall';
+                    selectedSlot = '4';
+                } else {
+                    myPlayer.currentWeapon = 'pistol'; // Revert to pistol after build mode
+                    selectedSlot = '1';
+                }
+                updateUI();
+            } else if (e.key === 'Enter' && chatInput.value.trim() !== '') {
+                sendChatMessage(chatInput.value.trim());
+                displayChatMessage(myPlayer.name, chatInput.value.trim(), myPlayer.color);
+                chatInput.value = '';
+            }
+        };
+
+        window.onkeyup = (e) => {
+            keys[e.key.toLowerCase()] = false;
+            sendPlayerUpdate(); // Send update when keys are released
+        };
+
+        canvas.onmousemove = (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            sendPlayerUpdate(); // Send update for angle
+        };
+
+        canvas.onmousedown = (e) => {
+            mouse.down = true;
+            if (!gameRunning) return;
+
+            if (myPlayer.buildMode && myPlayer.currentWeapon === 'wall') {
+                const buildX = Math.floor(mouse.x / 50) * 50;
+                const buildY = Math.floor(mouse.y / 50) * 50;
+
+                // Check for existing wall
+                const existingWall = walls.find(w => w.x === buildX && w.y === buildY);
+                if (!existingWall) {
+                    const newWall = { x: buildX, y: buildY, hp: WEAPONS.wall.hp, ownerId: myPlayer.id };
+                    walls.push(newWall);
+                    sendBuildWall(newWall);
+                } else {
+                     // If clicking an existing wall, "destroy" it for building
+                     walls = walls.filter(w => !(w.x === buildX && w.y === buildY));
+                     sendDestroyWall(buildX, buildY);
+                }
+                
+            } else { // Attack mode
+                const now = Date.now();
+                const weapon = WEAPONS[myPlayer.currentWeapon];
+                if (now - lastShotTime > weapon.firerate) {
+                    if (weapon.ammo === Infinity || myPlayer.ammo > 0) {
+                        lastShotTime = now;
+                        if (weapon.ammo !== Infinity) myPlayer.ammo--;
+
+                        if (myPlayer.currentWeapon === 'pistol') {
+                            const bullet = { x: myPlayer.x, y: myPlayer.y, vx: Math.cos(myPlayer.angle) * 10, vy: Math.sin(myPlayer.angle) * 10, ownerId: myPlayer.id, weapon: 'pistol' };
+                            bullets.push(bullet);
+                            sendBullet(bullet);
+                        } else if (myPlayer.currentWeapon === 'shotgun') {
+                            for (let i = -1; i <= 1; i++) { // 3 pellets
+                                const angleOffset = i * (Math.PI / 16); // Spread
+                                const bullet = { x: myPlayer.x, y: myPlayer.y, vx: Math.cos(myPlayer.angle + angleOffset) * 8, vy: Math.sin(myPlayer.angle + angleOffset) * 8, ownerId: myPlayer.id, weapon: 'shotgun' };
+                                bullets.push(bullet);
+                                sendBullet(bullet);
+                            }
+                        }
+                    }
+                }
+            }
+            updateUI();
+        };
+
+        canvas.onmouseup = (e) => {
+            mouse.down = false;
+        };
+
+        sendChatBtn.onclick = () => {
+            if (chatInput.value.trim() !== '') {
+                sendChatMessage(chatInput.value.trim());
+                displayChatMessage(myPlayer.name, chatInput.value.trim(), myPlayer.color);
+                chatInput.value = '';
+            }
+        };
+
+        // --- UI Update ---
+        function updateUI() {
+            myHpDisplay.innerText = myPlayer.hp;
+            myNameDisplay.innerText = myPlayer.name;
+            ammoDisplay.innerText = WEAPONS[myPlayer.currentWeapon].ammo === Infinity ? '∞' : (myPlayer.ammo || 0);
+            modeDisplay.innerText = myPlayer.buildMode ? 'Bauen' : 'Kampf';
+
+            for (const key in slots) {
+                slots[key].classList.remove('active');
+            }
+            if (selectedSlot) {
+                slots[selectedSlot].classList.add('active');
+            }
+        }
+
+        function displayChatMessage(sender, message, color) {
+            const msgElement = document.createElement('div');
+            msgElement.classList.add('chat-message');
+            msgElement.innerHTML = `<span style="color:${color};">${sender}:</span> ${message}`;
+            chatWindow.appendChild(msgElement);
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Scroll to bottom
+        }
+
+        function endGame(winnerName) {
+            gameRunning = false;
+            gameOverScreen.style.display = 'flex';
+            gameOverMessage.innerText = `${myPlayer.name}, du wurdest von ${winnerName} besiegt!`;
+        }
+
+        // Initial UI update
+        updateUI();
+        // Set initial ammo (can be expanded with a proper inventory system later)
+        myPlayer.ammo = WEAPONS.shotgun.ammo;
+    </script>
+</body>
+</html>
